@@ -40,16 +40,12 @@ extension Result where Success == Data {
     
     func getData() {
         let status = Reachability().connectionStatus()
-
         switch status {
         case .unknown, .offline:
             print("Not connected")
             self.getDataFromDB()
-        case .online(.wwan):
+        case .online(_):
             print("Connected via WWAN")
-            self.getDataFromServer()
-        case .online(.wiFi):
-            print("Connected via WiFi")
             self.getDataFromServer()
         }
         

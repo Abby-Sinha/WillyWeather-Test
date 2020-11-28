@@ -82,12 +82,25 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
     
     @objc func fetchedData(notification: Notification){
         self.details = notification.object as! [DB_Details]
-        DispatchQueue.main.async {
-            self.activityLoader.stopAnimating()
-            self.tblViewDetails.delegate = self
-            self.tblViewDetails.dataSource = self
-            self.tblViewDetails.reloadData()
+        if self.details.count > 0 {
+            DispatchQueue.main.async {
+                self.activityLoader.stopAnimating()
+                self.tblViewDetails.separatorStyle = .singleLine
+                self.tblViewDetails.delegate = self
+                self.tblViewDetails.dataSource = self
+                self.tblViewDetails.reloadData()
+            }
+        }else{
+            DispatchQueue.main.async {
+                self.activityLoader.stopAnimating()
+                let alert = UIAlertController(title: "No Data Found", message: "Please Check Your Internet connection and try again", preferredStyle:.alert)
+                alert.addAction(UIAlertAction(title: "Ok", style:.default, handler: { [self] action in
+                    self.dataManager.getData()
+                }))
+                self.present(alert, animated: true, completion: nil)
+            }
         }
+        
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -119,16 +132,7 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
             imageUrl = ASFileUtils.getFilePath(toDirectory: directoryName, withName: self.details[indexPath.row].id)
             print(imageUrl)
         
-        case .online(.wwan):
-            print("Connected via WWAN")
-            if self.details[indexPath.row].download_status == 1 {
-                imageUrl = ASFileUtils.getFilePath(toDirectory: directoryName, withName: self.details[indexPath.row].id)
-            }else{
-                imageUrl = URL(string: self.details[indexPath.row].download_url)!
-            }
-            
-        case .online(.wiFi):
-            print("Connected via WiFi")
+        case .online(_):
             if self.details[indexPath.row].download_status == 1 {
                 imageUrl = ASFileUtils.getFilePath(toDirectory: directoryName, withName: self.details[indexPath.row].id)
             }else{
@@ -142,9 +146,19 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
     func btnTapped(btn:UIButton, indexPath:IndexPath, cell:DetailsTableViewCell) {
         print("IndexPath : \(indexPath.row)")
         if btn.hasImage(named: "img_Download", for: .normal) {
-            cell.progressView.isHidden = false
-            btn.setImage(UIImage(named: "img_Cancel"), for: .normal)
-            backgroundDownload(id: self.details[indexPath.row].id, url: self.details[indexPath.row].download_url, cell: cell)
+            let status = Reachability().connectionStatus()
+            switch status {
+            case .unknown, .offline:
+                print("Not connected")
+                let alert = UIAlertController(title: "No Internet", message: "Please Check Your Internet connection", preferredStyle:.alert)
+                alert.addAction(UIAlertAction(title: "Ok", style:.default, handler: nil))
+                self.present(alert, animated: true, completion: nil)
+                return
+            case .online(_):
+                cell.progressView.isHidden = false
+                btn.setImage(UIImage(named: "img_Cancel"), for: .normal)
+                backgroundDownload(id: self.details[indexPath.row].id, url: self.details[indexPath.row].download_url, cell: cell)
+            }
         } else if btn.hasImage(named: "img_Cancel", for: .normal) {
             cell.progressView.isHidden = true
             btn.setImage(UIImage(named: "img_Download"), for: .normal)
@@ -178,7 +192,7 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
                     print("Downloaded file's url is \(url.path)")
                     cell.progressView.isHidden = true
                     self?.dataManager.updateDataInDB(id :id , download_status:1)
-                    self?.dataManager.getData()
+                    self?.dataManager.getDataFromDB()
                     
                 }
             }
